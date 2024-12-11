@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from django.contrib.auth import authenticate
 
 # Mark 视图
@@ -110,19 +110,6 @@ class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
         mark.delete()  # 删除条目
         return Response(status=status.HTTP_204_NO_CONTENT)  # 返回 204 表示删除成功，且没有返回内容
 
-# 用户收藏视图
-class UserMarkViewSet(viewsets.ModelViewSet):
-    serializer_class = UserMarkSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        # 返回当前用户的收藏条目
-        return UserMark.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        # 自动关联到当前用户
-        serializer.save(user=self.request.user)
-
 class UserRegistrationView(generics.CreateAPIView):
     serializer_class = UserRegistrationSerializer
 
@@ -176,3 +163,79 @@ class ChangePasswordView(APIView):
         
         return Response(serializer.errors, status=400)
     
+class UserMarkViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def list(self, request):
+        """
+        查看用户收藏的条目，支持按时间排序或按类别筛选
+        """
+        user = request.user
+        category = request.query_params.get('category', None)
+        valid_order_by_fields = ['created_at', 'id', 'mark', 'preference_level', 'updated_at']
+        order_by = request.query_params.get('order_by', 'created_at')
+
+        queryset = UserMark.objects.filter(user=user)
+        if category:
+            queryset = queryset.filter(mark__category=category)
+        if order_by not in valid_order_by_fields:
+            order_by = 'created_at'  # 默认按 created_at 排序
+        queryset = queryset.order_by(order_by if order_by else 'created_at')
+
+        serializer = UserMarkSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request):
+        """
+        收藏条目，用户可以添加备注和喜好等级
+        """
+        user = request.user
+        mark_id = request.data.get('mark')
+        note = request.data.get('note', "blank")
+        preference_level = request.data.get('preference_level', 0)
+
+        try:
+            mark = Mark.objects.get(id=mark_id)
+        except Mark.DoesNotExist:
+            return Response({"detail": "Mark not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        user_mark, created = UserMark.objects.get_or_create(
+            user=user,
+            mark=mark,
+            defaults={'note': note, 'preference_level': preference_level}
+        )
+
+        if not created:
+            return Response({"detail": "Already bookmarked."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = UserMarkSerializer(user_mark)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, pk=None):
+        """
+        更新收藏条目的备注或喜好等级
+        """
+        user = request.user
+        try:
+            user_mark = UserMark.objects.get(id=pk, user=user)
+        except UserMark.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UserMarkSerializer(user_mark, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        """
+        删除收藏条目
+        """
+        user = request.user
+        try:
+            user_mark = UserMark.objects.get(id=pk, user=user)
+        except UserMark.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        user_mark.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -27,11 +27,11 @@ class Mark(models.Model):
     def __str__(self):
         return f"{self.title} ({self.category})"
 
-# 用户收藏 Mark 模型
 class UserMark(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_marks')  # 收藏用户
     mark = models.ForeignKey(Mark, on_delete=models.CASCADE, related_name='user_marks')  # 被收藏条目
-    note = models.TextField(blank=True, null=True)  # 用户对条目的笔记
+    note = models.TextField(blank=True, null=True)  # 用户对条目的备注
+    preference_level = models.IntegerField(default=0)  # 用户喜好等级（0~5）
     created_at = models.DateTimeField(auto_now_add=True)  # 收藏时间
     updated_at = models.DateTimeField(auto_now=True)  # 笔记更新时间
 

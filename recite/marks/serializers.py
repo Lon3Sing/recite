@@ -10,13 +10,11 @@ class MarkSerializer(serializers.ModelSerializer):
 
 # 用户收藏序列化器
 class UserMarkSerializer(serializers.ModelSerializer):
-    mark = MarkSerializer(read_only=True)  # 嵌套 Mark 信息
-    mark_id = serializers.PrimaryKeyRelatedField(queryset=Mark.objects.all(), source='mark')  # 用于添加收藏时传递条目 ID
-
+    mark = MarkSerializer()  # 这里嵌套 Mark 序列化器
     class Meta:
         model = UserMark
-        fields = ['id', 'user', 'mark', 'mark_id', 'note', 'created_at', 'updated_at']
-        read_only_fields = ['user']
+        fields = ['id', 'mark', 'note', 'preference_level', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
