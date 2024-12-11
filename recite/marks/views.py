@@ -14,6 +14,7 @@ class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
     queryset = Mark.objects.all()
     serializer_class = MarkSerializer
     permission_classes = [permissions.AllowAny]  # 所有人可访问
+    
 
     def list(self, request):
         """

@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # My apps under
     'rest_framework',
+    'corsheaders',
     'marks',
     'rest_framework.authtoken',  # This is for token-based auth
     'rest_framework_simplejwt.token_blacklist',  # If you want to blacklist tokens
@@ -52,7 +53,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    'corsheaders.middleware.CorsMiddleware',
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'recite.urls'
 
