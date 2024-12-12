@@ -1,6 +1,6 @@
-from django.urls import path, include
+from django.urls import path, include, re_path
 from rest_framework.routers import DefaultRouter
-from .views import UserRegistrationView, UserProfileView, UserUpdateView, ChangePasswordView
+from .views import UserRegistrationView, UserProfileView, UserUpdateView, ChangePasswordView, MarkCollectionView
 from . import views
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -19,4 +19,5 @@ urlpatterns = [
     path('user/', UserProfileView.as_view(), name='user-profile'),
     path('user/update/', UserUpdateView.as_view(), name='user-update'),
     path('user/password/change/', ChangePasswordView.as_view(), name='change-password'),
+    path('collection/', MarkCollectionView.as_view(), name='mark-collection'), 
 ]

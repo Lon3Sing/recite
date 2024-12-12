@@ -9,8 +9,63 @@ from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes, action
 from django.contrib.auth import authenticate
 from rest_framework.filters import SearchFilter
+from rest_framework.generics import GenericAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 from .filters import MarkFilter
+from django.db.models import Q
+
+class MarkCollectionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        """
+        获取带有用户收藏状态的 Mark 列表，并根据过滤条件进行筛选。
+        """
+        # 获取当前登录用户
+        user = request.user
+
+        # 获取筛选条件
+        title = request.GET.get('title', None)
+        category = request.GET.get('category', None)
+        content = request.GET.get('content', None)
+        created_at_after = request.GET.get('created_at_after', None)
+        created_at_before = request.GET.get('created_at_before', None)
+        search = request.GET.get('search', None)  # 新增 search 参数
+        print(search)
+
+        # 获取查询集
+        queryset = Mark.objects.all()
+
+        # 根据 search 参数进行模糊匹配
+        if search:
+            # 使用 Q 对象进行 OR 查询
+            queryset = queryset.filter(
+                Q(title__icontains=search) | Q(content__icontains=search)
+            )
+        
+        # 根据筛选条件进行过滤
+        if title:
+            queryset = queryset.filter(title__icontains=title)  # 模糊匹配
+        if category:
+            queryset = queryset.filter(category__iexact=category)  # 精确匹配
+        if content:
+            queryset = queryset.filter(content__icontains=content)  # 模糊匹配
+        if created_at_after:
+            queryset = queryset.filter(created_at__gte=created_at_after)  # 过滤大于等于
+        if created_at_before:
+            queryset = queryset.filter(created_at__lte=created_at_before)  # 过滤小于等于
+
+        # 获取用户收藏的 Mark ID 列表
+        user_mark_ids = UserMark.objects.filter(user=user).values_list('mark_id', flat=True)
+
+        # 将每个 Mark 的数据序列化并添加收藏状态
+        marks = []
+        for mark in queryset:
+            mark_data = MarkSerializer(mark).data
+            mark_data['is_collected'] = mark.id in user_mark_ids  # 判断用户是否收藏
+            marks.append(mark_data)
+
+        return Response(marks)
 
 # Mark 视图
 class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
