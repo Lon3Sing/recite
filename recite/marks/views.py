@@ -8,27 +8,38 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes, action
 from django.contrib.auth import authenticate
+from rest_framework.filters import SearchFilter
+from django_filters.rest_framework import DjangoFilterBackend
+from .filters import MarkFilter
 
 # Mark 视图
 class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
     queryset = Mark.objects.all()
     serializer_class = MarkSerializer
     permission_classes = [permissions.AllowAny]  # 所有人可访问
+    filter_backends = (DjangoFilterBackend, SearchFilter)
+    filterset_class = MarkFilter  # 引用自定义的过滤器
+    search_fields = ['title', 'content', 'category']  # 设置搜索字段，可以选择根据 title, content, category 搜索
     
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # 如果你想增加其他的自定义查询条件，可以在这里进一步过滤
+        return queryset
 
-    def list(self, request):
-        """
-        GET /marks/
-        列出所有条目，支持按 category 参数筛选。
-        """
-        category = request.query_params.get('category', None)  # 获取 category 参数
-        if category:
-            marks = Mark.objects.filter(category=category)
-        else:
-            marks = Mark.objects.all()
+    # def list(self, request):
+    #     """
+    #     GET /marks/
+    #     列出所有条目，支持按 category 参数筛选。
+    #     """
+    #     category = request.query_params.get('category', None)  # 获取 category 参数
+    #     if category:
+    #         marks = Mark.objects.filter(category=category)
+    #     else:
+    #         marks = Mark.objects.all()
 
-        serializer = MarkSerializer(marks, many=True)
-        return Response(serializer.data)
+    #     serializer = MarkSerializer(marks, many=True)
+    #     return Response(serializer.data)
 
     def create(self, request):
         """
