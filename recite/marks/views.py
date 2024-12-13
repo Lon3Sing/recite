@@ -56,13 +56,16 @@ class MarkCollectionView(APIView):
             queryset = queryset.filter(created_at__lte=created_at_before)  # 过滤小于等于
 
         # 获取用户收藏的 Mark ID 列表
+        user_marks = UserMark.objects.filter(user=user)
         user_mark_ids = UserMark.objects.filter(user=user).values_list('mark_id', flat=True)
+        user_mark_dict = {um.mark_id: um.id for um in user_marks}  # {mark_id: user_mark_id}
 
         # 将每个 Mark 的数据序列化并添加收藏状态
         marks = []
         for mark in queryset:
             mark_data = MarkSerializer(mark).data
             mark_data['is_collected'] = mark.id in user_mark_ids  # 判断用户是否收藏
+            mark_data['collected_mark_id'] = user_mark_dict.get(mark.id, None)  # 如果收藏了该条目，返回对应收藏记录的 ID
             marks.append(mark_data)
 
         return Response(marks)
