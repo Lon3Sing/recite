@@ -13,6 +13,7 @@ from rest_framework.generics import GenericAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 from .filters import MarkFilter
 from django.db.models import Q
+from rest_framework.pagination import PageNumberPagination
 
 class MarkCollectionView(APIView):
     permission_classes = [IsAuthenticated]
@@ -21,8 +22,14 @@ class MarkCollectionView(APIView):
         """
         获取带有用户收藏状态的 Mark 列表，并根据过滤条件进行筛选。
         """
+        VALID_SORT_FIELDS = ['id', 'title', 'category', 'created_at']
+        
         # 获取当前登录用户
         user = request.user
+
+        # 分页信息
+        page = int(request.GET.get('page', 1) if request.GET.get('page', 1) != '' else 1)
+        page_size = int(request.GET.get('page_size', 20) if request.GET.get('page_size', 20) != '' else 20)
 
         # 获取筛选条件
         title = request.GET.get('title', None)
@@ -31,7 +38,13 @@ class MarkCollectionView(APIView):
         created_at_after = request.GET.get('created_at_after', None)
         created_at_before = request.GET.get('created_at_before', None)
         search = request.GET.get('search', None)  # 新增 search 参数
-        print(search)
+        sort_by = request.GET.get('sort_by', None)  # 排序字段
+        order = request.GET.get('order', 'desc')  # 排序方式，默认为降序
+        
+        
+        # 验证 sort_by 是否是有效字段
+        if sort_by not in VALID_SORT_FIELDS:
+            sort_by = 'created_at'
 
         # 获取查询集
         queryset = Mark.objects.all()
@@ -55,20 +68,42 @@ class MarkCollectionView(APIView):
         if created_at_before:
             queryset = queryset.filter(created_at__lte=created_at_before)  # 过滤小于等于
 
+        if sort_by:
+            if order == 'desc':
+                queryset = queryset.order_by(f'-{sort_by}')  # 降序
+            else:
+                queryset = queryset.order_by(sort_by)  # 升序
+
         # 获取用户收藏的 Mark ID 列表
         user_marks = UserMark.objects.filter(user=user)
         user_mark_ids = UserMark.objects.filter(user=user).values_list('mark_id', flat=True)
         user_mark_dict = {um.mark_id: um.id for um in user_marks}  # {mark_id: user_mark_id}
 
+        # 分页
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated_queryset = queryset[start:end]
+
         # 将每个 Mark 的数据序列化并添加收藏状态
         marks = []
-        for mark in queryset:
+        for mark in paginated_queryset:
             mark_data = MarkSerializer(mark).data
             mark_data['is_collected'] = mark.id in user_mark_ids  # 判断用户是否收藏
             mark_data['collected_mark_id'] = user_mark_dict.get(mark.id, None)  # 如果收藏了该条目，返回对应收藏记录的 ID
             marks.append(mark_data)
 
-        return Response(marks)
+        # 返回分页结果
+        total_count = queryset.count()  # 获取所有符合条件的总数
+        total_pages = (total_count + page_size - 1) // page_size  # 总页数，向上取整
+
+        # 构建分页信息
+        response_data = {
+            'count': total_count,
+            'total_pages': total_pages,
+            'results': marks
+        }
+
+        return Response(response_data)
 
 # Mark 视图
 class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
@@ -238,22 +273,70 @@ class UserMarkViewSet(viewsets.ViewSet):
 
     def list(self, request):
         """
-        查看用户收藏的条目，支持按时间排序或按类别筛选
+        查看用户收藏的条目，支持按时间排序、按类别筛选、分页和搜索
         """
         user = request.user
-        category = request.query_params.get('category', None)
-        valid_order_by_fields = ['created_at', 'id', 'mark', 'preference_level', 'updated_at']
-        order_by = request.query_params.get('order_by', 'created_at')
 
+        category = request.GET.get('category', None)
+        sort_by = request.GET.get('sort_by', 'created_at')
+        search = request.GET.get('search', None)
+        order = request.GET.get('order', 'desc')  # 排序方式，默认为降序
+
+        if order != 'asc' and order != 'desc':
+            order = 'desc'
+        
+
+        # 定义有效的排序字段
+        valid_sort_by_fields = ['created_at', 'id', 'mark', 'preference_level']
+        
+        # 如果 order_by 无效，默认为 'created_at'
+        if sort_by not in valid_sort_by_fields:
+            sort_by = 'created_at'
+
+        # 获取分页参数，默认为第1页，每页20条
+        page = int(request.GET.get('page', 1) if request.GET.get('page', 1) != '' else 1)
+        page_size = int(request.GET.get('page_size', 20) if request.GET.get('page_size', 20) != '' else 20)
+
+        # 查询 UserMark，并根据用户和分类进行筛选
         queryset = UserMark.objects.filter(user=user)
+        
+        # 根据 category 进行过滤（如果提供）
         if category:
             queryset = queryset.filter(mark__category=category)
-        if order_by not in valid_order_by_fields:
-            order_by = 'created_at'  # 默认按 created_at 排序
-        queryset = queryset.order_by(order_by if order_by else 'created_at')
 
-        serializer = UserMarkSerializer(queryset, many=True)
-        return Response(serializer.data)
+        # 如果提供了 search 参数，进行模糊匹配（title 或 content）
+        if search:
+            queryset = queryset.filter(
+                Q(mark__title__icontains=search) | Q(mark__content__icontains=search) | Q(note__icontains=search)
+            )
+        
+        # 根据 order_by 排序
+        if sort_by:
+            if order == 'desc':
+                queryset = queryset.order_by(f'-{sort_by}')  # 降序
+            else:
+                queryset = queryset.order_by(sort_by)  # 升序
+
+        # 分页
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated_queryset = queryset[start:end]
+
+        # 序列化数据
+        serializer = UserMarkSerializer(paginated_queryset, many=True)
+
+        # 计算总条目数，用于分页信息
+        total_count = queryset.count()
+        total_pages = (total_count + page_size - 1) // page_size  # 向上取整
+
+        # 构建分页结果
+        response_data = {
+            'count': total_count,
+            'results': serializer.data,
+            'total_pages': total_pages
+        }
+
+        return Response(response_data)
 
     def create(self, request):
         """

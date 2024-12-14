@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta  # 确保导入 timedelta
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -155,4 +157,15 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',  # 使用页码分页
+    'PAGE_SIZE': 2,  # 每页默认显示 20 条
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),  # 设置 access token 的有效时间为 60 分钟
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),     # 设置 refresh token 的有效时间为 7 天
+    'ROTATE_REFRESH_TOKENS': True,                    # 启用刷新 token 的轮换
+    'BLACKLIST_AFTER_ROTATION': True,                 # 启用将轮换的 token 加入黑名单
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
 }
