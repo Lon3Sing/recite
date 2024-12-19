@@ -13,7 +13,6 @@ from rest_framework.generics import GenericAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 from .filters import MarkFilter
 from django.db.models import Q
-from rest_framework.pagination import PageNumberPagination
 
 class MarkCollectionView(APIView):
     permission_classes = [IsAuthenticated]
@@ -113,6 +112,7 @@ class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = MarkFilter  # 引用自定义的过滤器
     search_fields = ['title', 'content', 'category']  # 设置搜索字段，可以选择根据 title, content, category 搜索
+    pagination_class = None  # 禁用分页
     
     def get_queryset(self):
         queryset = super().get_queryset()

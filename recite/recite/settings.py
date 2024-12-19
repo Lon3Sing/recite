@@ -76,6 +76,7 @@ CORS_ALLOW_METHODS = [
     'PUT',
     'DELETE',
     'OPTIONS',
+    'PATCH',
 ]
 
 ROOT_URLCONF = 'recite.urls'
@@ -158,7 +159,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',  # 使用页码分页
-    'PAGE_SIZE': 2,  # 每页默认显示 20 条
+    'PAGE_SIZE': 20,  # 每页默认显示 20 条
 }
 
 SIMPLE_JWT = {
