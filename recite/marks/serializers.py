@@ -1,12 +1,18 @@
 from rest_framework import serializers
-from .models import Mark, UserMark
+from .models import Mark, UserMark, Tag
 from django.contrib.auth import get_user_model
+
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ['id', 'name']
 
 # 固定 Mark 序列化器
 class MarkSerializer(serializers.ModelSerializer):
+    tags = TagSerializer(many=True) 
     class Meta:
         model = Mark
-        fields = ['id', 'title', 'content', 'category', 'created_at']
+        fields = ['id', 'title', 'content', 'category', 'created_at', 'tags']
 
 # 用户收藏序列化器
 class UserMarkSerializer(serializers.ModelSerializer):

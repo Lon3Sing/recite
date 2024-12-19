@@ -1,5 +1,5 @@
 from rest_framework import viewsets, permissions, generics, status
-from .models import Mark, UserMark
+from .models import Mark, UserMark, Tag
 from .serializers import MarkSerializer, UserMarkSerializer, UserRegistrationSerializer, UserUpdateSerializer, ChangePasswordSerializer
 
 from django.contrib.auth import get_user_model
@@ -111,7 +111,7 @@ class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
     permission_classes = [permissions.AllowAny]  # 所有人可访问
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = MarkFilter  # 引用自定义的过滤器
-    search_fields = ['title', 'content', 'category']  # 设置搜索字段，可以选择根据 title, content, category 搜索
+    search_fields = ['title', 'content', 'category', 'tags__name']  # 设置搜索字段，可以选择根据 title, content, category 搜索
     pagination_class = None  # 禁用分页
     
     def get_queryset(self):
@@ -142,7 +142,7 @@ class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
         title = request.data.get('title')
         content = request.data.get('content')
         category = request.data.get('category')
-        print(content)
+        tag_names = request.data.get('tags', [])  # 获取 tags 的名称列表
         # 参数验证
         if not all([title, content, category]):
             return Response(
@@ -154,6 +154,11 @@ class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
             content=content,
             category=category
         )
+
+        for tag_name in tag_names:
+            tag, created = Tag.objects.get_or_create(name=tag_name)  # get_or_create 确保唯一性
+            mark.tags.add(tag)  # 关联 tag
+
         serializer = MarkSerializer(mark)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

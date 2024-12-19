@@ -11,6 +11,12 @@ class User(AbstractUser):
         verbose_name = "用户"
         verbose_name_plural = "用户"
 
+class Tag(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+
 # 固定 Mark 模型
 class Mark(models.Model):
     CATEGORY_CHOICES = [
@@ -23,6 +29,7 @@ class Mark(models.Model):
     content = models.TextField()  # 条目内容
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)  # 分类
     created_at = models.DateTimeField(auto_now_add=True)  # 创建时间
+    tags = models.ManyToManyField(Tag, related_name='marks')  # 多对多关系
 
     def __str__(self):
         return f"{self.title} ({self.category})"
