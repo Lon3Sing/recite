@@ -52,7 +52,9 @@ class MarkCollectionView(APIView):
         if search:
             # 使用 Q 对象进行 OR 查询
             queryset = queryset.filter(
-                Q(title__icontains=search) | Q(content__icontains=search)
+                Q(title__icontains=search) |
+                Q(content__icontains=search) |
+                Q(tags__name__icontains=search)  # 对 tags 的 name 进行模糊查询
             )
         
         # 根据筛选条件进行过滤
@@ -312,7 +314,7 @@ class UserMarkViewSet(viewsets.ViewSet):
         # 如果提供了 search 参数，进行模糊匹配（title 或 content）
         if search:
             queryset = queryset.filter(
-                Q(mark__title__icontains=search) | Q(mark__content__icontains=search) | Q(note__icontains=search)
+                Q(mark__title__icontains=search) | Q(mark__content__icontains=search) | Q(note__icontains=search) | Q(mark__tags__name__icontains=search)
             )
         
         # 根据 order_by 排序
