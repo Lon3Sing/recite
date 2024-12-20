@@ -211,7 +211,7 @@ class MarkViewSet(viewsets.ModelViewSet):  # 只读接口
         serializer = MarkSerializer(mark)  # 使用序列化器将数据返回
         return Response(serializer.data)
 
-    def put(self, request, pk=None):
+    def update(self, request, pk=None):
         """
         PUT /marks/{id}/
         更新某个条目的信息（全量更新），只允许管理员
@@ -224,23 +224,27 @@ class MarkViewSet(viewsets.ModelViewSet):  # 只读接口
         except Mark.DoesNotExist:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # 获取传入的 tags_id 数据，假设它是一个 ID 列表
-        tag_ids = request.data.get('tags', [])
+        # 获取传入的标签名称
+        tag_names = request.data.get('tags', [])
+        
+        # 处理标签，查找是否存在，不存在则创建
+        tag_objects = []
+        for tag_name in tag_names:
+            tag = Tag.objects.filter(name=tag_name).first()  # 查找标签是否存在
+            if tag is None:
+                tag = Tag.objects.create(name=tag_name)  # 如果不存在，创建新标签
+            tag_objects.append(tag)  # 将找到或创建的标签对象添加到列表中
 
-        # 检查标签 ID 是否有效
-        tags = Tag.objects.filter(id__in=tag_ids)  # 根据 ID 查找标签
-        if len(tags) != len(tag_ids):
-            return Response({"detail": "Some tags do not exist."}, status=status.HTTP_400_BAD_REQUEST)
+        # 构造标签数据格式（包括 id 和 name）
+        request.data['tags'] = [{"id": tag.id, "name": tag.name} for tag in tag_objects]
+        print(request.data['tags'])
 
-        # 将标签对象列表传递给 request.data['tags']，这将传递标签的实例到序列化器
-        request.data['tags'] = tags  # 手动更新 tags 数据为对象
-
-        # 更新 Mark 实例
+        # 更新其他字段并保存
         serializer = MarkSerializer(mark, data=request.data)  # 用新数据进行序列化
         if serializer.is_valid():
             serializer.save()  # 保存更新
             return Response(serializer.data)
-
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

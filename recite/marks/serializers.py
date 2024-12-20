@@ -15,9 +15,9 @@ class MarkSerializer(serializers.ModelSerializer):
     class Meta:
         model = Mark
         fields = ['id', 'title', 'content', 'category', 'created_at', 'tags']
-
+    
     def update(self, instance, validated_data):
-    # 提取 tags 字段的数据
+        # 提取 tags 字段的数据
         tags_data = validated_data.pop('tags', None)
 
         # 更新 Mark 对象的其他字段
