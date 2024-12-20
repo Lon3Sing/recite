@@ -1,9 +1,10 @@
 from rest_framework import viewsets, permissions, generics, status
 from .models import Mark, UserMark, Tag
-from .serializers import MarkSerializer, UserMarkSerializer, UserRegistrationSerializer, UserUpdateSerializer, ChangePasswordSerializer
+from .serializers import MarkSerializer, UserMarkSerializer, UserRegistrationSerializer, UserUpdateSerializer, ChangePasswordSerializer, TagSerializer, CustomTokenObtainPairSerializer
+from rest_framework.permissions import BasePermission
 
 from django.contrib.auth import get_user_model
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes, action
@@ -11,8 +12,36 @@ from django.contrib.auth import authenticate
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import GenericAPIView
 from django_filters.rest_framework import DjangoFilterBackend
-from .filters import MarkFilter
+from .filters import MarkFilter, TagFilter
 from django.db.models import Q
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+class IsMarkManager(BasePermission):
+    def has_permission(self, request, view):
+        # 判断用户是否是管理员
+        return request.user.is_superuser or request.user.is_mark_manager
+
+class TagViewSet(viewsets.ModelViewSet):
+    """
+    Tag 的视图集，提供所有 CRUD 操作
+    """
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = [AllowAny]  # 所有人可访问
+    filter_backends = (DjangoFilterBackend, SearchFilter)
+    filterset_class = TagFilter  # 过滤器
+    search_fields = ['name']  # 只搜索 Tag 的 name 字段
+    pagination_class = None  # 根据需要禁用分页
+
+    # 可以根据需要重写查询集（get_queryset）或者实现自定义行为
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        # 可以在这里根据某些自定义条件进行进一步的过滤
+        return queryset
 
 class MarkCollectionView(APIView):
     permission_classes = [IsAuthenticated]
@@ -107,15 +136,20 @@ class MarkCollectionView(APIView):
         return Response(response_data)
 
 # Mark 视图
-class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
+class MarkViewSet(viewsets.ModelViewSet):  # 只读接口
     queryset = Mark.objects.all()
     serializer_class = MarkSerializer
-    permission_classes = [permissions.AllowAny]  # 所有人可访问
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = MarkFilter  # 引用自定义的过滤器
     search_fields = ['title', 'content', 'category', 'tags__name']  # 设置搜索字段，可以选择根据 title, content, category 搜索
     pagination_class = None  # 禁用分页
     
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [IsMarkManager()]
+        # 其他操作（查看和创建），允许所有用户
+        return [AllowAny()]
+
     def get_queryset(self):
         queryset = super().get_queryset()
         
@@ -177,47 +211,72 @@ class MarkViewSet(viewsets.ReadOnlyModelViewSet):  # 只读接口
         serializer = MarkSerializer(mark)  # 使用序列化器将数据返回
         return Response(serializer.data)
 
-    def update(self, request, pk=None):
+    def put(self, request, pk=None):
         """
         PUT /marks/{id}/
-        更新某个条目的信息（全量更新）
+        更新某个条目的信息（全量更新），只允许管理员
         """
+        if not request.user.is_superuser:  # 判断是否为管理员
+            return Response({"detail": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             mark = Mark.objects.get(pk=pk)  # 获取指定 id 的条目
         except Mark.DoesNotExist:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)  # 如果找不到，返回 404
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # 获取传入的 tags_id 数据，假设它是一个 ID 列表
+        tag_ids = request.data.get('tags', [])
+
+        # 检查标签 ID 是否有效
+        tags = Tag.objects.filter(id__in=tag_ids)  # 根据 ID 查找标签
+        if len(tags) != len(tag_ids):
+            return Response({"detail": "Some tags do not exist."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 将标签对象列表传递给 request.data['tags']，这将传递标签的实例到序列化器
+        request.data['tags'] = tags  # 手动更新 tags 数据为对象
+
+        # 更新 Mark 实例
         serializer = MarkSerializer(mark, data=request.data)  # 用新数据进行序列化
         if serializer.is_valid():
             serializer.save()  # 保存更新
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  # 如果数据无效，返回错误信息
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
 
     def partial_update(self, request, pk=None):
         """
         PATCH /marks/{id}/
-        更新某个条目的部分信息（部分更新）
+        更新某个条目的部分信息（部分更新），只允许管理员
         """
+        if not request.user.is_superuser:  # 判断是否为管理员
+            return Response({"detail": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             mark = Mark.objects.get(pk=pk)  # 获取指定 id 的条目
         except Mark.DoesNotExist:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)  # 如果找不到，返回 404
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = MarkSerializer(mark, data=request.data, partial=True)  # 部分更新
         if serializer.is_valid():
             serializer.save()  # 保存更新
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  # 如果数据无效，返回错误信息
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         """
         DELETE /marks/{id}/
-        删除某个条目
+        删除某个条目，只允许管理员
         """
+        if not request.user.is_superuser:  # 判断是否为管理员
+            return Response({"detail": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             mark = Mark.objects.get(pk=pk)  # 获取指定 id 的条目
         except Mark.DoesNotExist:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)  # 如果找不到，返回 404
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
         mark.delete()  # 删除条目
         return Response(status=status.HTTP_204_NO_CONTENT)  # 返回 204 表示删除成功，且没有返回内容

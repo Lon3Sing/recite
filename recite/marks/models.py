@@ -1,11 +1,13 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from rest_framework import permissions
 
 # 用户模型
 class User(AbstractUser):
     # 自定义字段
     bio = models.TextField(blank=True, null=True, verbose_name="用户简介")
     profile_picture = models.ImageField(upload_to='profiles/', blank=True, null=True, verbose_name="头像")
+    is_mark_manager = models.BooleanField(default=False)  # 自定义字段，表示是否为管理员
 
     class Meta:
         verbose_name = "用户"
@@ -47,3 +49,30 @@ class UserMark(models.Model):
 
     def __str__(self):
         return f"{self.user.username} -> {self.mark.title}"
+
+# 定义自定义管理员类
+class Administrator(AbstractUser):
+    # 为防止与默认 User 模型发生冲突，添加 related_name
+    is_mark_manager = models.BooleanField(default=True, help_text="Can manage Marks")
+    is_tag_manager = models.BooleanField(default=True, help_text="Can manage Tags")
+
+    # 修改 'groups' 和 'user_permissions' 的 related_name
+    groups = models.ManyToManyField(
+        'auth.Group',
+        related_name='administrator_groups',  # 自定义反向关系
+        blank=True
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        related_name='administrator_permissions',  # 自定义反向关系
+        blank=True
+    )
+
+    def __str__(self):
+        return self.username
+
+# 可选: 为 Admin 用户赋予额外的权限
+class Permission(models.Model):
+    admin = models.ForeignKey(Administrator, on_delete=models.CASCADE)
+    can_manage_marks = models.BooleanField(default=False)
+    can_manage_tags = models.BooleanField(default=False)

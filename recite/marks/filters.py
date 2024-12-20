@@ -1,5 +1,5 @@
 import django_filters
-from .models import Mark
+from .models import Mark, Tag
 
 class MarkFilter(django_filters.FilterSet):
     title = django_filters.CharFilter(lookup_expr='icontains', label="Title contains")
@@ -10,7 +10,7 @@ class MarkFilter(django_filters.FilterSet):
     class Meta:
         model = Mark
         fields = ['title', 'category', 'created_at']
-        
+
     def filter_by_tags(self, queryset, name, value):
         """
         通过 tag 名称过滤 Mark 实例。
@@ -19,3 +19,10 @@ class MarkFilter(django_filters.FilterSet):
             # 使用 contains 来模糊匹配 tags 的名称
             return queryset.filter(tags__name__icontains=value)
         return queryset
+    
+class TagFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(lookup_expr='icontains', label="Name contains")
+
+    class Meta:
+        model = Tag
+        fields = ['name']
