@@ -42,6 +42,17 @@ class TagViewSet(viewsets.ModelViewSet):
 
         # 可以在这里根据某些自定义条件进行进一步的过滤
         return queryset
+    
+    def destroy(self, request, pk=None):
+        """
+        DELETE /marks/{id}/
+        删除某个条目，只允许管理员
+        """
+        if not request.user.is_superuser:  # 判断是否为管理员
+            return Response({"detail": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+        tag = self.get_object()
+        self.perform_destroy(tag)
+        return Response({"detail": "Tag deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
 
 class MarkCollectionView(APIView):
     permission_classes = [IsAuthenticated]

@@ -103,3 +103,5 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             data['is_admin'] = False
 
         return data
+    
+
