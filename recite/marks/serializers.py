@@ -3,6 +3,15 @@ from .models import Mark, UserMark, Tag
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from .models import UserCollection, CollectionMark
+
+class UserCollectionSerializer(serializers.ModelSerializer):
+    # 这个字段表示该收藏夹中所有的条目
+    marks_count = serializers.IntegerField(source='marks.count', read_only=True)
+
+    class Meta:
+        model = UserCollection
+        fields = ['id', 'name', 'created_at', 'updated_at', 'marks_count']
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:

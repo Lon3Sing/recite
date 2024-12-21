@@ -76,3 +76,25 @@ class Permission(models.Model):
     admin = models.ForeignKey(Administrator, on_delete=models.CASCADE)
     can_manage_marks = models.BooleanField(default=False)
     can_manage_tags = models.BooleanField(default=False)
+
+class UserCollection(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='collections')
+    name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.user.username}"
+
+class CollectionMark(models.Model):
+    collection = models.ForeignKey(UserCollection, on_delete=models.CASCADE, related_name='marks')
+    mark = models.ForeignKey(Mark, on_delete=models.CASCADE)
+    note = models.TextField(blank=True, default="")
+    preference_level = models.IntegerField(default=0)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('collection', 'mark')  # 确保每个收藏夹和标记的组合是唯一的
+
+    def __str__(self):
+        return f"{self.collection.name} - {self.mark.title}"
