@@ -15,6 +15,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .filters import MarkFilter, TagFilter
 from django.db.models import Q
 from rest_framework_simplejwt.views import TokenObtainPairView
+from django.shortcuts import get_object_or_404
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -23,6 +24,50 @@ class IsMarkManager(BasePermission):
     def has_permission(self, request, view):
         # 判断用户是否是管理员
         return request.user.is_superuser or request.user.is_mark_manager
+
+class UpdateMarkTagsView(APIView):
+    """
+    自定义视图用于更新 Mark 的 Tags
+    """
+    permission_classes = [permissions.IsAuthenticated]  # 需要用户已登录
+
+    def patch(self, request, mark_id):
+        """
+        更新指定 Mark 的 Tags
+        """
+
+        if not request.user.is_superuser:  # 判断是否为管理员
+            return Response({"detail": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+        
+        # 获取 Mark 对象
+        mark = get_object_or_404(Mark, id=mark_id)
+
+        # 获取前端传递的 tags 名称列表
+        tag_names = request.data.get('tags', [])
+        if not isinstance(tag_names, list):
+            return Response({"error": "Tags must be a list of tag names."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 处理 Tag：创建新标签或获取现有标签
+        tags = []
+        for tag_name in tag_names:
+            tag, created = Tag.objects.get_or_create(name=tag_name)
+            tags.append(tag)
+
+        # 更新 Mark 的 Tags
+        mark.tags.set(tags)  # 设置新的 Tags
+        mark.save()
+
+        # 手动构造响应数据
+        response_data = {
+            "id": mark.id,
+            "title": mark.title,
+            "content": mark.content,
+            "category": mark.category,
+            "created_at": mark.created_at,
+            "tags": [{"id": tag.id, "name": tag.name} for tag in mark.tags.all()]
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 class TagViewSet(viewsets.ModelViewSet):
     """

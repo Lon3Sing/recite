@@ -1,6 +1,6 @@
 from django.urls import path, include, re_path
 from rest_framework.routers import DefaultRouter
-from .views import UserRegistrationView, UserProfileView, UserUpdateView, ChangePasswordView, MarkCollectionView, TagViewSet
+from .views import UserRegistrationView, UserProfileView, UserUpdateView, ChangePasswordView, MarkCollectionView, TagViewSet, UpdateMarkTagsView
 from . import views
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -23,4 +23,5 @@ urlpatterns = [
     path('user/update/', UserUpdateView.as_view(), name='user-update'),
     path('user/password/change/', ChangePasswordView.as_view(), name='change-password'),
     path('collection/', MarkCollectionView.as_view(), name='mark-collection'), 
+    path('marks/<int:mark_id>/update-tags/', UpdateMarkTagsView.as_view(), name='update-mark-tags'),
 ]
